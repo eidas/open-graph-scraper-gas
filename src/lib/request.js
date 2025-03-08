@@ -1,65 +1,32 @@
-import { decode } from 'iconv-lite';
 import { load } from 'cheerio';
-import chardet from 'chardet';
 
 /**
- * checks if an element exists
- */
-const doesElementExist = (selector, attribute, $) => (
-  $(selector).attr(attribute) && ($(selector).attr(attribute)?.length ?? 0) > 0
-);
-
-/**
- * gets the charset of the html
- */
-function getCharset(body, buffer, $) {
-  if (doesElementExist('meta', 'charset', $)) {
-    return $('meta').attr('charset');
-  }
-  if (doesElementExist('head > meta[name="charset"]', 'content', $)) {
-    return $('head > meta[name="charset"]').attr('content');
-  }
-  if (doesElementExist('head > meta[http-equiv="content-type"]', 'content', $)) {
-    const content = $('head > meta[http-equiv="content-type"]').attr('content') ?? '';
-    const charsetRegEx = /charset=([^()<>@,;:"/\\]?.=\\s]*)/i;
-
-    if (charsetRegEx.test(content)) {
-      const charsetRegExExec = charsetRegEx.exec(content);
-      if (charsetRegExExec?.[1]) return charsetRegExExec[1];
-    }
-  }
-  if (body) {
-    return chardet.detect(Buffer.from(buffer));
-  }
-
-  return 'utf-8';
-}
-
-/**
- * performs the fetch request and formats the body for ogs
- * Adapted for Google Apps Script using URLFetchApp
+ * Google Apps Scriptの環境でHTTPリクエストを実行してHTMLを取得
  *
- * @param {object} options - options for ogs
- * @return {object} formatted request body and response
- *
+ * @param {object} options - オプション設定
+ * @return {object} HTMLの本文とレスポンス情報
  */
 export default async function requestAndResultsFormatter(options) {
   let body;
   let response;
+  
   try {
+    // URL エンコーディングの確認
     // eslint-disable-next-line no-control-regex
     const isLatin1 = /^[\\u0000-\\u00ff]{0,}$/;
-
     let url = options.url ?? '';
-    if (!isLatin1.test(url)) url = encodeURI(url);
+    
+    if (!isLatin1.test(url)) {
+      url = encodeURI(url);
+    }
 
-    // Google Apps Script用のFetch処理
+    // Google Apps Scriptのfetch処理
     const fetchOptions = {
       muteHttpExceptions: true,
       followRedirects: true,
       ...options.fetchOptions,
       headers: { 
-        Origin: url ?? '', 
+        Origin: url, 
         Accept: 'text/html', 
         ...(options.fetchOptions?.headers || {}) 
       }
@@ -70,44 +37,26 @@ export default async function requestAndResultsFormatter(options) {
       fetchOptions.timeoutInSeconds = options.timeout;
     }
 
-    // GASのURLFetchAppを使用
+    // UrlFetchAppを使用してリクエスト実行
     try {
       response = UrlFetchApp.fetch(url, fetchOptions);
     } catch (fetchError) {
       throw new Error(`Fetch failed: ${fetchError.message}`);
     }
 
+    // レスポンスの処理
     const responseCode = response.getResponseCode();
     const contentType = response.getHeaders()['Content-Type'] || '';
-    const responseBody = response.getContentText();
     
-    // レスポンスヘッダーとボディをJavaScript標準のフォーマットに変換
-    const standardResponse = {
-      status: responseCode,
-      headers: {
-        get: (name) => {
-          const headers = response.getHeaders();
-          return headers[name] || headers[name.toLowerCase()];
-        }
-      },
-      body: responseBody
-    };
-
-    // バイナリデータの取得とエンコーディング処理
-    const bodyArrayBuffer = response.getContent();
-    const bodyText = Utilities.newBlob(bodyArrayBuffer).getDataAsString();
-    const charset = getCharset(bodyText, bodyArrayBuffer, load(bodyText)) ?? 'utf-8';
+    // レスポンスボディの取得
+    body = response.getContentText();
     
-    if (charset.toLowerCase() === 'utf-8') {
-      body = bodyText;
-    } else {
-      body = decode(Buffer.from(bodyArrayBuffer), charset);
-    }
-
+    // コンテンツタイプの確認
     if (contentType && !contentType.toLowerCase().includes('text/')) {
       throw new Error('Page must return a header content-type with text/');
     }
     
+    // HTTP エラーコードの処理
     if (responseCode >= 400) {
       switch (responseCode) {
         case 400: throw new Error('400 Bad Request');
@@ -124,13 +73,25 @@ export default async function requestAndResultsFormatter(options) {
       }
     }
 
+    // ボディが空の場合のエラー
     if (body === undefined || body === '') {
       throw new Error('Page not found');
     }
     
+    // レスポンスオブジェクトの標準化
+    const standardResponse = {
+      status: responseCode,
+      headers: {
+        get: (name) => {
+          const headers = response.getHeaders();
+          return headers[name] || headers[name.toLowerCase()];
+        }
+      }
+    };
+    
     return { body, response: standardResponse };
   } catch (error) {
-    if (error instanceof Error && error.message === 'fetch failed') throw error.cause;
+    if (error.message === 'fetch failed') throw error.cause || error;
     throw error;
   }
 }
