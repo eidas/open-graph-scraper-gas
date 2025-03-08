@@ -74,13 +74,13 @@ function removeTypeAnnotations(fileContent) {
     }
     
     // 変数宣言の型注釈を削除
-    line = line.replace(/(\w+)\s*:\s*[A-Za-z0-9<>[\]|&]+\s*=/g, '$1 =');
+    line = line.replace(/(\w+)\s*:\s*[A-Za-z0-9<>\[\]|&]+\s*=/g, '$1 =');
     
     // 関数パラメータの型注釈を削除 (この部分が重要)
-    line = line.replace(/(\(|\,\s*)([a-zA-Z0-9_]+)\s*:\s*[A-Za-z0-9<>[\]|&]+/g, '$1$2');
+    line = line.replace(/(\(|\,\s*)([a-zA-Z0-9_]+)\s*:\s*[A-Za-z0-9<>\[\]|&]+/g, '$1$2');
     
     // 関数の戻り値型を削除
-    line = line.replace(/\)\s*:\s*[A-Za-z0-9<>[\]|&]+\s*{/g, ') {');
+    line = line.replace(/\)\s*:\s*[A-Za-z0-9<>\[\]|&]+\s*{/g, ') {');
     
     // ジェネリック型パラメータを削除
     line = line.replace(/<[^<>]*>/g, '');
@@ -133,12 +133,12 @@ for (const file of filesToConvert) {
     let content = fs.readFileSync(file.to, 'utf8');
     
     // function宣言の型注釈を全て削除（特に問題になりやすい箇所）
-    content = content.replace(/function\s+\w+\s*\(([^)]*)\)\s*:?\s*[A-Za-z0-9<>[\]|&]+\s*{/g, function(match, params) {
+    content = content.replace(/function\s+\w+\s*\(([^)]*)\)\s*:?\s*[A-Za-z0-9<>\[\]|&]+\s*{/g, function(match, params) {
       return `function ${match.split('function ')[1].split('(')[0]}(${params}) {`;
     });
     
     // 残りの型注釈を直接削除
-    content = content.replace(/:\s*[A-Za-z0-9<>[\]|&]+/g, '');
+    content = content.replace(/:\s*[A-Za-z0-9<>\[\]|&]+/g, '');
     
     // エラーになりやすい特定のパターンに対する修正
     if (file.to.includes('extract.js')) {
@@ -193,7 +193,7 @@ jsFiles.forEach(file => {
     content = content.replace(/export\s*=\s*(\w+);/g, 'export default $1;');
     
     // その他の細かな型情報を削除
-    content = content.replace(/(\w+)\s*:\s*[A-Za-z0-9<>[\]|&]+(?=\s*[,)])/g, '$1');
+    content = content.replace(/(\w+)\s*:\s*[A-Za-z0-9<>\[\]|&]+(?=\s*[,)])/g, '$1');
     
     fs.writeFileSync(file, content);
     console.log(`- 修正: ${file}`);
@@ -292,7 +292,7 @@ export function isUrlValid(url, urlValidatorSettings) {
   return typeof url === 'string' && url.length > 0 && isUrl(url, urlValidatorSettings);
 }
 
-const coerceUrl = (url) => (/^(f|ht)tps?:\\/\\//i.test(url) ? url : \`http://\${url}\`);
+const coerceUrl = (url) => (/^(f|ht)tps?:\/\//i.test(url) ? url : \`http://\${url}\`);
 
 export function validateAndFormatURL(url, urlValidatorSettings) {
   return { url: isUrlValid(url, urlValidatorSettings) ? coerceUrl(url) : null };
@@ -353,7 +353,7 @@ export function unescapeScriptText(scriptText) {
   return scriptText.replace(/\\\\x([0-9a-f]{2})/ig, (_, pair) => {
     const charCode = parseInt(pair, 16);
     if (charCode === 34) {
-      return '\\\\"';
+      return '\\"';
     }
     return String.fromCharCode(charCode);
   });
