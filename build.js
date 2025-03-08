@@ -10,6 +10,18 @@ directories.forEach(dir => {
   }
 });
 
+// tempディレクトリが存在する場合は削除
+if (fs.existsSync('temp')) {
+  try {
+    console.log('既存のtempディレクトリを削除中...');
+    fs.rmSync('temp', { recursive: true, force: true });
+    console.log('✓ tempディレクトリの削除が完了しました');
+  } catch (error) {
+    console.error('tempディレクトリの削除に失敗しました:', error);
+    process.exit(1);
+  }
+}
+
 // オリジナルリポジトリのソースコードを取得
 console.log('オリジナルのリポジトリをクローン中...');
 try {
