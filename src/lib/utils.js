@@ -28,7 +28,7 @@ export function isUrlValid(url, urlValidatorSettings) {
 /**
  * URLが 'http://' または 'https://' で始まるようにする
  */
-const coerceUrl = (url) => (/^(f|ht)tps?:\\/\\//i.test(url) ? url : `http://${url}`);
+const coerceUrl = (url) => (/^(f|ht)tps?:\/\//i.test(url) ? url : `http://${url}`);
 
 /**
  * URLを検証してフォーマットする
