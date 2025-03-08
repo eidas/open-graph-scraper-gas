@@ -30,6 +30,12 @@
     "webpack": "^5.90.3",
     "webpack-cli": "^5.1.4"
   },
+  "resolutions": {
+    "webpack": "^5.90.3"
+  },
+  "overrides": {
+    "webpack": "^5.90.3"
+  },
   "keywords": [
     "google-apps-script",
     "open graph",
