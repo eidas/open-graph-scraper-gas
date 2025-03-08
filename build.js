@@ -30,6 +30,49 @@ try {
   process.exit(1);
 }
 
+// 基本的な正規表現による型情報の削除だけでなく、簡易的なJavaScriptトランスパイル処理
+function transpileTypeScript(content) {
+  // 型のインポートを削除
+  content = content.replace(/import\s+type\s+.*?from\s+['"].*?['"];?/g, '');
+  content = content.replace(/import\s+{(.*?)}\s+from\s+['"].*?['"]/g, (match, imports) => {
+    // 型情報を含むインポートを修正
+    if (imports.includes('type')) {
+      // 型と通常のインポートを分けて処理
+      const cleanedImports = imports.split(',')
+        .map(i => i.trim())
+        .filter(i => !i.includes('type'))
+        .join(', ');
+      
+      if (cleanedImports.length === 0) {
+        return ''; // 純粋に型だけのインポートは削除
+      }
+      return `import { ${cleanedImports} } from ${match.split('from')[1].trim()}`;
+    }
+    return match; // 型情報がなければそのまま
+  });
+
+  // 関数の型注釈を削除
+  content = content.replace(/: \w+(\[\])?(?=\s*[,)])/g, '');
+  content = content.replace(/: \w+(\[\])?\s*=>/g, '=>');
+  
+  // オブジェクト型注釈を削除
+  content = content.replace(/: {[^}]*}/g, '');
+  
+  // ジェネリック型パラメータを削除
+  content = content.replace(/<.*?>/g, '');
+
+  // インターフェースとタイプエイリアスの定義を削除
+  content = content.replace(/export\s+interface\s+\w+\s*{[\s\S]*?}/g, '');
+  content = content.replace(/interface\s+\w+\s*{[\s\S]*?}/g, '');
+  content = content.replace(/export\s+type\s+.*?;/g, '');
+  content = content.replace(/type\s+.*?;/g, '');
+
+  // デフォルトエクスポートの問題修正
+  content = content.replace(/export\s*=\s*(\w+);/g, 'export default $1;');
+
+  return content;
+}
+
 // ファイルをTypeScriptからJavaScriptに変換
 console.log('ソースファイルを変換中...');
 
@@ -50,26 +93,26 @@ filesToConvert.forEach(file => {
   try {
     let content = fs.readFileSync(file.from, 'utf8');
     
-    // 型情報を削除
-    content = content.replace(/import type.*?from.*?;/g, '');
-    content = content.replace(/import.*?type.*?}/g, 'import');
-    content = content.replace(/: \w+(\[\])?/g, '');
-    content = content.replace(/: {.*?}/g, '');
-    content = content.replace(/<.*?>/g, '');
-    
-    // インターフェース定義を削除
-    content = content.replace(/export interface.*?}/gs, '');
-    content = content.replace(/interface.*?}/gs, '');
-    content = content.replace(/export type.*?;/g, '');
-    content = content.replace(/type.*?;/g, '');
+    // より強力な型情報削除処理を使用
+    content = transpileTypeScript(content);
     
     fs.writeFileSync(file.to, content);
+    console.log(`- ${file.from} -> ${file.to}`);
   } catch (error) {
     console.error(`ファイル ${file.from} の変換に失敗しました:`, error);
   }
 });
 
 console.log('✓ ソースファイルの変換が完了しました');
+
+// 変換されたファイルが存在するか確認
+filesToConvert.forEach(file => {
+  if (!fs.existsSync(file.to)) {
+    console.error(`警告: ${file.to} が存在しません。`);
+  } else {
+    console.log(`確認: ${file.to} は正常に生成されました。`);
+  }
+});
 
 // ビルド実行
 console.log('ライブラリをビルド中...');
@@ -81,6 +124,14 @@ try {
   console.error('ビルドに失敗しました:');
   // スタックトレースを表示
   console.error(error);
+  process.exit(1);
+}
+
+// ビルド結果を確認
+if (fs.existsSync('dist/openGraphScraperGAS.js')) {
+  console.log('✓ 生成されたファイルを確認しました: dist/openGraphScraperGAS.js');
+} else {
+  console.error('エラー: ビルドが完了しましたが、出力ファイルが見つかりません。');
   process.exit(1);
 }
 
