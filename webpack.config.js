@@ -12,6 +12,10 @@ module.exports = {
     libraryTarget: 'var',
     library: 'OpenGraphScraper'
   },
+  // より詳細なエラー情報のために追加
+  stats: {
+    errorDetails: true
+  },
   optimization: {
     minimize: true,
     minimizer: [
