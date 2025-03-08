@@ -8,6 +8,7 @@ import {
   validateAndFormatURL,
 } from './utils';
 
+
 /**
  * sets up options for the fetch request and calls extract on html
  *
@@ -25,7 +26,7 @@ export default async function setOptionsAndReturnOpenGraphResults(ogsOptions) {
   if (options.html) {
     const ogObject = extractMetaTags(options.html, options);
     ogObject.success = true;
-    return { ogObject, response: { body: options.html }, html: options.html };
+    return { ogObject, response, html };
   }
 
   const formattedUrl = validateAndFormatURL(options.url ?? '', (options.urlValidatorSettings ?? defaultUrlValidatorSettings));
@@ -47,9 +48,8 @@ export default async function setOptionsAndReturnOpenGraphResults(ogsOptions) {
     const ogObject = extractMetaTags(body, options);
 
     ogObject.requestUrl = options.url;
-    ogObject.success = true;
 
-    return { ogObject, response, html: body };
+    return { ogObject, response, html };
   } catch (exception) {
     if (exception && (exception.code === 'ENOTFOUND' || exception.code === 'EHOSTUNREACH' || exception.code === 'ENETUNREACH')) {
       throw new Error('Page not found');
