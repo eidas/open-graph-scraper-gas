@@ -74,10 +74,13 @@ console.log('✓ ソースファイルの変換が完了しました');
 // ビルド実行
 console.log('ライブラリをビルド中...');
 try {
+  // 詳細なエラー出力のためにstdioを'inherit'に設定
   execSync('npm run build', { stdio: 'inherit' });
   console.log('✓ ビルドが完了しました');
 } catch (error) {
-  console.error('ビルドに失敗しました:', error);
+  console.error('ビルドに失敗しました:');
+  // スタックトレースを表示
+  console.error(error);
   process.exit(1);
 }
 
