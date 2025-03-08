@@ -42,11 +42,13 @@ try {
   process.exit(1);
 }
 
-// 基本的な正規表現による型情報の削除だけでなく、簡易的なJavaScriptトランスパイル処理
+// 改善したTypeScript変換処理
 function transpileTypeScript(content) {
-  // 型のインポートを削除
-  content = content.replace(/import\s+type\s+.*?from\s+['"].*?['"];?/g, '');
-  content = content.replace(/import\s+{(.*?)}\s+from\s+['"].*?['"]/g, (match, imports) => {
+  // 型のインポートを削除 (import type ...)
+  content = content.replace(/import\s+type\s+.*?from\s+['"].*?['"];?\s*/g, '');
+  
+  // import { type ... } の形式を処理
+  content = content.replace(/import\s+{([^}]*)}\s+from\s+['"]([^'"]+)['"];?/g, (match, imports, source) => {
     // 型情報を含むインポートを修正
     if (imports.includes('type')) {
       // 型と通常のインポートを分けて処理
@@ -58,30 +60,40 @@ function transpileTypeScript(content) {
       if (cleanedImports.length === 0) {
         return ''; // 純粋に型だけのインポートは削除
       }
-      return `import { ${cleanedImports} } from ${match.split('from')[1].trim()}`;
+      return `import { ${cleanedImports} } from '${source}';`;
     }
     return match; // 型情報がなければそのまま
   });
-
-  // 関数の型注釈を削除
-  content = content.replace(/: \w+(\[\])?(?=\s*[,)])/g, '');
-  content = content.replace(/: \w+(\[\])?\s*=>/g, '=>');
   
-  // オブジェクト型注釈を削除
-  content = content.replace(/: {[^}]*}/g, '');
+  // 変数宣言の型注釈を削除 (let x: Type = ...)
+  content = content.replace(/(\b(?:let|const|var)\s+\w+)\s*:\s*\w+(?:\[\])?\s*=/g, '$1 =');
   
-  // ジェネリック型パラメータを削除
-  content = content.replace(/<.*?>/g, '');
-
+  // 関数の型注釈を削除 (function(x: Type, y: Type): ReturnType {)
+  content = content.replace(/(\((?:[^()]*?))\s*:\s*\w+(?:\[\])?(?=\s*[,)])/g, '$1');
+  content = content.replace(/(\))\s*:\s*\w+(?:\[\])?\s*{/g, '$1 {');
+  
+  // アロー関数の型注釈を削除 ((x: Type) => ...)
+  content = content.replace(/(\([^()]*?):\s*\w+(?:\[\])?\s*(=>)/g, '$1$2');
+  
+  // オブジェクト型注釈を削除 (const x: { prop: Type } = ...)
+  content = content.replace(/:\s*{[^{}]*}/g, '');
+  
+  // ジェネリック型パラメータを削除 (<Type>)
+  content = content.replace(/<[^<>]*>/g, '');
+  
   // インターフェースとタイプエイリアスの定義を削除
-  content = content.replace(/export\s+interface\s+\w+\s*{[\s\S]*?}/g, '');
-  content = content.replace(/interface\s+\w+\s*{[\s\S]*?}/g, '');
-  content = content.replace(/export\s+type\s+.*?;/g, '');
-  content = content.replace(/type\s+.*?;/g, '');
-
+  content = content.replace(/export\s+interface\s+\w+\s*{[\s\S]*?}\s*/g, '');
+  content = content.replace(/interface\s+\w+\s*{[\s\S]*?}\s*/g, '');
+  content = content.replace(/export\s+type\s+.*?;\s*/g, '');
+  content = content.replace(/type\s+.*?;\s*/g, '');
+  
+  // 残りのTypeScript固有構文の削除
+  content = content.replace(/:\s*\w+(\[\])?(\s*\|\s*\w+(\[\])?)*\s*=/g, ' ='); // Union Types
+  content = content.replace(/as\s+\w+(\[\])?/g, ''); // Type Assertions
+  
   // デフォルトエクスポートの問題修正
   content = content.replace(/export\s*=\s*(\w+);/g, 'export default $1;');
-
+  
   return content;
 }
 
@@ -108,6 +120,9 @@ filesToConvert.forEach(file => {
     // より強力な型情報削除処理を使用
     content = transpileTypeScript(content);
     
+    // 変換結果をデバッグ用に出力（問題が続く場合のために）
+    fs.writeFileSync(`${file.to}.debug`, content);
+    
     fs.writeFileSync(file.to, content);
     console.log(`- ${file.from} -> ${file.to}`);
   } catch (error) {
@@ -126,6 +141,25 @@ filesToConvert.forEach(file => {
   }
 });
 
+// 手動修正用の処理を追加
+console.log('TypeScript残留型情報を手動で修正中...');
+
+// extract.jsの修正 (ogObject: OgObjectInternal = { ... })の問題を修正
+if (fs.existsSync('src/lib/extract.js')) {
+  let content = fs.readFileSync('src/lib/extract.js', 'utf8');
+  content = content.replace(/let ogObject: OgObjectInternal = { success: true };/g, 'let ogObject = { success: true };');
+  fs.writeFileSync('src/lib/extract.js', content);
+}
+
+// utils.jsの修正 (import type { ... }の問題を修正)
+if (fs.existsSync('src/lib/utils.js')) {
+  let content = fs.readFileSync('src/lib/utils.js', 'utf8');
+  content = content.replace(/import type {[\s\S]*?};/g, '');
+  fs.writeFileSync('src/lib/utils.js', content);
+}
+
+console.log('✓ 手動修正が完了しました');
+
 // ビルド実行
 console.log('ライブラリをビルド中...');
 try {
@@ -142,6 +176,9 @@ try {
 // ビルド結果を確認
 if (fs.existsSync('dist/openGraphScraperGAS.js')) {
   console.log('✓ 生成されたファイルを確認しました: dist/openGraphScraperGAS.js');
+  // ファイルサイズを表示
+  const stats = fs.statSync('dist/openGraphScraperGAS.js');
+  console.log(`  ファイルサイズ: ${(stats.size / 1024).toFixed(2)} KB`);
 } else {
   console.error('エラー: ビルドが完了しましたが、出力ファイルが見つかりません。');
   process.exit(1);
