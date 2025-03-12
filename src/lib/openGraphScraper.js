@@ -14,7 +14,7 @@ import {
  * @param {object} ogsOptions - Open Graph Scraperのオプション
  * @return {object} Open Graph結果を含むオブジェクト
  */
-export default async function setOptionsAndReturnOpenGraphResults(ogsOptions) {
+export default  function setOptionsAndReturnOpenGraphResults(ogsOptions) {
   const { options } = optionSetup(ogsOptions);
 
   // URLとHTMLの両方が指定されている場合はエラー
@@ -47,7 +47,7 @@ export default async function setOptionsAndReturnOpenGraphResults(ogsOptions) {
 
   try {
     // リクエストを実行してHTMLを取得
-    const { body, response } = await requestAndResultsFormatter(options);
+    const { body, response } = requestAndResultsFormatter(options);
     
     // HTMLからメタタグを抽出
     const ogObject = extractMetaTags(body, options);

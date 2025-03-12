@@ -6,7 +6,7 @@ import { load } from 'cheerio';
  * @param {object} options - オプション設定
  * @return {object} HTMLの本文とレスポンス情報
  */
-export default async function requestAndResultsFormatter(options) {
+export default function requestAndResultsFormatter(options) {
   let body;
   let response;
   

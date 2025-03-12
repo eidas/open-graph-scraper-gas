@@ -14,12 +14,12 @@ import setOptionsAndReturnOpenGraphResults from './lib/openGraphScraper';
  * @param {string} [options.html] - You can pass in an HTML string to run ogs on it. (use without options.url)
  * @param {number} [options.timeout] - Number of seconds before the fetch request ends. (default is 10 seconds)
  * @param {string} options.url - URL of the site. (Required)
- * @returns {Promise} Promise Object with the Open Graph results
+ * @returns {string} Promise Object with the Open Graph results
  */
-async function run(options) {
+function run(options) {
   let results;
   try {
-    results = await setOptionsAndReturnOpenGraphResults(options);
+    results = setOptionsAndReturnOpenGraphResults(options);
   } catch (error) {
     const exception = error;
     const returnError = {
